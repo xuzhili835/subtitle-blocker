@@ -1,0 +1,48 @@
+{
+  "name": "subtitle-blocker",
+  "version": "1.0.0",
+  "description": "字幕遮挡器",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron .",
+    "build": "tsc && vite build",
+    "package": "electron-builder"
+  },
+  "keywords": [
+    "subtitle",
+    "blocker",
+    "electron",
+    "desktop"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^24.6.1",
+    "electron": "^38.2.0",
+    "electron-builder": "^26.0.12",
+    "png-to-ico": "^3.0.1",
+    "sharp": "^0.34.4",
+    "typescript": "^5.9.3",
+    "vite": "^7.1.7"
+  },
+  "build": {
+    "appId": "com.subtitleblocker.app",
+    "productName": "Subtitle Blocker",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}

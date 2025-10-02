@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>字幕遮挡器控制面板</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: transparent;
+            overflow: hidden;
+            user-select: none;
+            -webkit-user-select: none;
+            width: 100vw;
+            height: 100vh;
+            -webkit-app-region: drag;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .control-container {
+            background: rgba(30, 30, 30, 0.98);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            padding: 20px;
+            color: white;
+            width: 250px;
+            backdrop-filter: blur(20px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        }
+
+        .control-container h3 {
+            margin-bottom: 16px;
+            text-align: center;
+            font-weight: 500;
+            color: #ffffff;
+            font-size: 14px;
+        }
+
+        .control-item {
+            margin-bottom: 16px;
+        }
+
+        .control-item label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            color: #e0e0e0;
+        }
+
+        .control-item input[type="range"] {
+            width: 100%;
+            height: 30px;
+            background: rgba(255, 255, 255, 0.2);
+            outline: none;
+            -webkit-appearance: none;
+            border-radius: 3px;
+            -webkit-app-region: no-drag;
+            padding: 10px 0;
+            cursor: pointer;
+        }
+
+        .control-item input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #4CAF50;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 2px solid white;
+            margin-top: -2px;
+        }
+
+        .control-item input[type="color"] {
+            width: 100%;
+            height: 36px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            background: rgba(255, 255, 255, 0.1);
+            -webkit-app-region: no-drag;
+        }
+
+        .control-item button {
+            width: 100%;
+            padding: 10px;
+            border: none;
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            transition: background-color 0.2s ease;
+            -webkit-app-region: no-drag;
+        }
+
+        .control-item button:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .control-item button.quit {
+            background: rgba(244, 67, 54, 0.8);
+        }
+
+        .control-item button.quit:hover {
+            background: rgba(244, 67, 54, 0.9);
+        }
+
+        .status-info {
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.6);
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="control-container">
+        <h3>字幕遮挡器控制</h3>
+
+        <div class="control-item">
+            <label>透明度调节:</label>
+            <input type="range" id="opacitySlider" min="0" max="100" value="80">
+        </div>
+
+        <div class="control-item">
+            <label>背景颜色:</label>
+            <input type="color" id="colorPicker" value="#000000">
+        </div>
+
+        
+        <div class="control-item">
+            <button id="quitApp" class="quit">退出应用</button>
+        </div>
+
+        <div class="status-info">
+            方向键调节透明度<br>
+            空格键关闭此面板
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const opacitySlider = document.getElementById('opacitySlider');
+            const colorPicker = document.getElementById('colorPicker');
+            const quitAppBtn = document.getElementById('quitApp');
+
+            // 初始化
+            function init() {
+                loadSettings();
+                setupEventListeners();
+            }
+
+            function setupEventListeners() {
+                // 透明度控制
+                opacitySlider.addEventListener('input', updateOpacity);
+
+                // 颜色控制
+                colorPicker.addEventListener('input', updateColor);
+
+                
+                // 退出应用
+                quitAppBtn.addEventListener('click', quitApp);
+
+                // 键盘快捷键
+                document.addEventListener('keydown', function(e) {
+                    if (e.key === ' ') {
+                        e.preventDefault();
+                        hideControlPanel();
+                    }
+                });
+
+                // 监听透明度更新（来自主窗口滚轮）
+                if (window.electronAPI && window.electronAPI.onOpacityUpdate) {
+                    window.electronAPI.onOpacityUpdate((event, opacity) => {
+                        opacitySlider.value = opacity;
+                    });
+                }
+            }
+
+            function updateOpacity() {
+                const opacity = parseInt(opacitySlider.value) / 100;
+                const color = colorPicker.value;
+                updateBlockerStyle(color, opacity);
+                saveSettings();
+            }
+
+            function updateColor() {
+                const opacity = parseInt(opacitySlider.value) / 100;
+                const color = colorPicker.value;
+                updateBlockerStyle(color, opacity);
+                saveSettings();
+            }
+
+            function updateBlockerStyle(color, opacity) {
+                if (window.electronAPI && window.electronAPI.updateBlockerStyle) {
+                    window.electronAPI.updateBlockerStyle({
+                        color: color,
+                        opacity: opacity
+                    });
+                }
+            }
+
+            
+            function hideControlPanel() {
+                if (window.electronAPI && window.electronAPI.showControlPanel) {
+                    window.electronAPI.showControlPanel();
+                }
+            }
+
+            function quitApp() {
+                if (window.electronAPI && window.electronAPI.quitApp) {
+                    window.electronAPI.quitApp();
+                }
+            }
+
+            function saveSettings() {
+                // 设置现在通过IPC在主进程中保存，这里不需要操作
+            }
+
+            async function loadSettings() {
+                try {
+                    if (window.electronAPI && window.electronAPI.getSettings) {
+                        const settings = await window.electronAPI.getSettings();
+                        opacitySlider.value = settings.opacity || 80;
+                        colorPicker.value = settings.color || '#000000';
+                        updateOpacity();
+                    }
+                } catch (e) {
+                    console.error('Failed to load settings:', e);
+                    // 如果无法获取设置，使用默认值
+                    opacitySlider.value = 80;
+                    colorPicker.value = '#000000';
+                    updateOpacity();
+                }
+            }
+
+            init();
+        });
+    </script>
+</body>
+</html>

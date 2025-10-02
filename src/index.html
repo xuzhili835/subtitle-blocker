@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>字幕遮挡器</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: transparent;
+            overflow: hidden;
+            user-select: none;
+            -webkit-user-select: none;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        .blocker {
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            cursor: move;
+            -webkit-app-region: drag;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .blocker:hover .resize-handle {
+            opacity: 1;
+        }
+
+        .resize-handle {
+            position: absolute;
+            background: rgba(100, 100, 100, 0.6);
+            -webkit-app-region: no-drag;
+            z-index: 10;
+            opacity: 0;
+            transition: all 0.2s ease;
+        }
+
+        .resize-handle:hover {
+            background: rgba(150, 150, 150, 0.8);
+        }
+
+        .resize-handle.corner {
+            width: 12px;
+            height: 12px;
+            background: rgba(120, 120, 120, 0.7);
+            border-radius: 2px;
+        }
+
+        .resize-handle.corner:hover {
+            background: rgba(160, 160, 160, 0.9);
+        }
+
+        .resize-handle.edge {
+            background: rgba(90, 90, 90, 0.5);
+        }
+
+        .resize-handle.edge:hover {
+            background: rgba(140, 140, 140, 0.7);
+        }
+
+        /* 调整手柄位置 - 内嵌式圆角设计 */
+        .resize-handle.top-left {
+            top: 2px;
+            left: 2px;
+            cursor: nw-resize;
+        }
+        .resize-handle.top-right {
+            top: 2px;
+            right: 2px;
+            cursor: ne-resize;
+        }
+        .resize-handle.bottom-left {
+            bottom: 2px;
+            left: 2px;
+            cursor: sw-resize;
+        }
+        .resize-handle.bottom-right {
+            bottom: 2px;
+            right: 2px;
+            cursor: se-resize;
+        }
+
+        .resize-handle.top {
+            top: 2px;
+            left: 14px;
+            right: 14px;
+            height: 4px;
+            cursor: n-resize;
+        }
+        .resize-handle.bottom {
+            bottom: 2px;
+            left: 14px;
+            right: 14px;
+            height: 4px;
+            cursor: s-resize;
+        }
+        .resize-handle.left {
+            left: 2px;
+            top: 14px;
+            bottom: 14px;
+            width: 4px;
+            cursor: w-resize;
+        }
+        .resize-handle.right {
+            right: 2px;
+            top: 14px;
+            bottom: 14px;
+            width: 4px;
+            cursor: e-resize;
+        }
+
+        .hint {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 11px;
+            pointer-events: none;
+            text-align: right;
+            line-height: 1.3;
+            z-index: 5;
+        }
+    </style>
+</head>
+<body>
+    <div class="blocker" id="blocker">
+        <!-- 调整大小手柄 -->
+        <div class="resize-handle corner top-left" data-handle="top-left"></div>
+        <div class="resize-handle corner top-right" data-handle="top-right"></div>
+        <div class="resize-handle corner bottom-left" data-handle="bottom-left"></div>
+        <div class="resize-handle corner bottom-right" data-handle="bottom-right"></div>
+        <div class="resize-handle edge top" data-handle="top"></div>
+        <div class="resize-handle edge bottom" data-handle="bottom"></div>
+        <div class="resize-handle edge left" data-handle="left"></div>
+        <div class="resize-handle edge right" data-handle="right"></div>
+    </div>
+
+    <!-- 操作提示 -->
+    <div class="hint" id="hint">
+        空格键打开控制面板<br>
+        方向键调节透明度
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const blocker = document.getElementById('blocker');
+            const hint = document.getElementById('hint');
+
+            let isResizing = false;
+            let currentHandle = '';
+            let startX = 0;
+            let startY = 0;
+
+            function init() {
+                loadSettings();
+                setupEventListeners();
+                showHint();
+            }
+
+            function setupEventListeners() {
+
+                // 滚轮调节透明度 - 修复：直接在blocker上监听并阻止默认行为
+                blocker.addEventListener('wheel', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const delta = e.deltaY > 0 ? -5 : 5;
+                    adjustOpacity(delta);
+                }, { passive: false });
+
+                // 键盘快捷键
+                document.addEventListener('keydown', function(e) {
+                    switch(e.key) {
+                        case 'ArrowUp':
+                            e.preventDefault();
+                            adjustOpacity(5);
+                            break;
+                        case 'ArrowDown':
+                            e.preventDefault();
+                            adjustOpacity(-5);
+                            break;
+                        case ' ':
+                            e.preventDefault();
+                            showControlPanel();
+                            break;
+                    }
+                });
+
+                setupResizeHandlers();
+            }
+
+            function setupResizeHandlers() {
+                const handles = document.querySelectorAll('.resize-handle');
+
+                handles.forEach(handle => {
+                    handle.addEventListener('mousedown', function(e) {
+                        isResizing = true;
+                        currentHandle = this.dataset.handle;
+                        startX = e.screenX;
+                        startY = e.screenY;
+                        e.preventDefault();
+                        e.stopPropagation();
+                    });
+                });
+
+                document.addEventListener('mousemove', function(e) {
+                    if (isResizing) {
+                        const deltaX = e.screenX - startX;
+                        const deltaY = e.screenY - startY;
+                        resizeWindow(deltaX, deltaY);
+                    }
+                });
+
+                document.addEventListener('mouseup', function() {
+                    isResizing = false;
+                    currentHandle = '';
+                });
+            }
+
+            function resizeWindow(deltaX, deltaY) {
+                if (window.electronAPI && window.electronAPI.resizeWindow) {
+                    window.electronAPI.resizeWindow({
+                        handle: currentHandle,
+                        deltaX: deltaX,
+                        deltaY: deltaY
+                    });
+                }
+            }
+
+            function adjustOpacity(delta) {
+                if (window.electronAPI && window.electronAPI.adjustOpacity) {
+                    window.electronAPI.adjustOpacity(delta);
+                }
+            }
+
+            function showControlPanel() {
+                if (window.electronAPI && window.electronAPI.showControlPanel) {
+                    window.electronAPI.showControlPanel();
+                }
+            }
+
+            function loadSettings() {
+                // 设置现在在主进程中管理，这里不需要操作
+                // 主进程会在窗口加载完成后自动应用保存的设置
+            }
+
+            function showHint() {
+                setTimeout(() => {
+                    hint.style.opacity = '0';
+                    setTimeout(() => hint.remove(), 500);
+                }, 5000);
+            }
+
+            // 监听来自主进程的样式更新
+            if (window.electronAPI && window.electronAPI.onStyleUpdate) {
+                window.electronAPI.onStyleUpdate((event, data) => {
+                    blocker.style.backgroundColor = `rgba(${data.r}, ${data.g}, ${data.b}, ${data.opacity})`;
+                });
+            }
+
+            init();
+        });
+    </script>
+</body>
+</html>
